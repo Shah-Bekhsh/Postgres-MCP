@@ -1,6 +1,5 @@
 import asyncio
 import ollama
-import sys
 import os
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
@@ -32,8 +31,6 @@ async def main():
                 for tool in tools_response.tools
             ]
 
-            question = sys.argv[1]
-
             system_message = {
                 "role": "system",
                 "content": """You are a database assistant with access to a PostgreSQL database.
@@ -47,30 +44,33 @@ async def main():
 
             messages = [
                 system_message,
-                {
-                    "role": "user",
-                    "content": question
-                }
             ]
-
+            
             while True:
-                chat_response = await ollama.AsyncClient().chat(
-                    model=os.getenv("OLLAMA_MODEL"),
-                    messages=messages,
-                    tools=available_tools
-                )
-
-                if not chat_response.message.tool_calls:
-                    print(chat_response.message.content)
+                question = input("You: ")
+                if question.lower() in ["quit", "exit"]:
                     break
+                
+                messages.append({"role": "user", "content": question})
 
-                messages.append({"role": "assistant", "content": "", "tool_calls": chat_response.message.tool_calls})
-    
-                for tool_call in chat_response.message.tool_calls:
-                    tool_name = tool_call.function.name
-                    tool_args = tool_call.function.arguments
-                    tool_result = await session.call_tool(tool_name, tool_args)
-                    messages.append({"role": "tool", "content": str(tool_result.content)})
+                while True:
+                    chat_response = await ollama.AsyncClient().chat(
+                        model=os.getenv("OLLAMA_MODEL"),
+                        messages=messages,
+                        tools=available_tools
+                    )
+
+                    if not chat_response.message.tool_calls:
+                        print(chat_response.message.content)
+                        break
+
+                    messages.append({"role": "assistant", "content": "", "tool_calls": chat_response.message.tool_calls})
+        
+                    for tool_call in chat_response.message.tool_calls:
+                        tool_name = tool_call.function.name
+                        tool_args = tool_call.function.arguments
+                        tool_result = await session.call_tool(tool_name, tool_args)
+                        messages.append({"role": "tool", "content": str(tool_result.content)})
 
 if __name__ == "__main__":
     asyncio.run(main())
